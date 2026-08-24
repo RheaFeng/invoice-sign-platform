@@ -15,7 +15,7 @@
 | 启动本地服务器（调试用） | 双击 `start-server.bat` |
 | 安装为 Windows 服务（可选） | 右键 `install-service.bat` → 以管理员身份运行 |
 | 上传到 GitHub | 用 GitHub Desktop 或 `git` 命令行 |
-| 部署到 Render | 按 `DEPLOY-RENDER-NEON.md` 操作 |
+| 部署到公网 | **首选 Vercel（无需信用卡）** 按 `DEPLOY-VERCEL.md`；备选 Render 按 `DEPLOY-RENDER-NEON.md` |
 
 ## ❌ 千万不要做的事
 
@@ -25,13 +25,15 @@
 | Win+R 粘贴 `node -e "..."` | 打开 cmd/PowerShell 后再粘贴 |
 | 在文件资源管理器里"打开" .js | 用编辑器或命令行打开 |
 
-## 部署 6 步速览
+## 部署 6 步速览（Vercel 方案，无需信用卡）
 
-详见 `DEPLOY-RENDER-NEON.md`，简要步骤：
+详见 `DEPLOY-VERCEL.md`，简要步骤：
 
-1. **生成密钥**：双击 `generate-secrets.bat` → 把生成的 3 个值记下来
-2. **注册 Neon**：https://neon.tech → 创建项目 → 复制连接串 → 选 Singapore 区域
-3. **推 GitHub**：用 GitHub Desktop 把 `invoice-sign-platform` 推到自己的 GitHub
-4. **Render 建服务**：https://render.com → New Web Service → 选仓库 → Free 套餐 → 填环境变量
-5. **验证**：访问 `https://你的服务名.onrender.com/admin` 登录
-6. **保活**：用 UptimeRobot 监控 `/healthz`，避免免费实例 15 分钟无请求后休眠
+1. **生成密钥**：双击 `generate-secrets.bat` → 把生成的 3 个值记下来（另需自定 1 个 `CRON_SECRET`）
+2. **注册 Neon**：https://neon.tech → 创建项目 → 复制连接串 → 选 Singapore 区域（已完成 ✅）
+3. **推 GitHub**：用 GitHub Desktop 或命令行把改造后的代码推到 `RheaFeng/invoice-sign-platform`
+4. **Vercel 部署**：https://vercel.com → Sign Up（GitHub 登录）→ Add New Project → Import `invoice-sign-platform` → 填环境变量 → Deploy
+5. **验证**：访问 `https://invoice-sign-platform.vercel.app/admin` 登录
+6. **每日提醒**：Vercel Cron 已配置（每天北京 8:00 自动触发，需设 `CRON_SECRET`）
+
+> 注：Vercel 免费版无需绑定信用卡；Render 新账号需要绑卡验证（已弃用，保留文档作备选）。

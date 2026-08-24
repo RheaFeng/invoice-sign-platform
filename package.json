@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "vercel-build": "echo '[vercel] no build step required'"
   },
   "engines": {
     "node": ">=18"

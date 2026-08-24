@@ -12,6 +12,7 @@ const loginLimiter = rateLimit({
   message: { error: '尝试次数过多，请 15 分钟后再试' },
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { trustProxy: false }, // Vercel 反向代理场景关闭该校验
 });
 
 // 系统是否已初始化（是否有管理员账号）

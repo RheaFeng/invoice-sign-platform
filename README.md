@@ -28,21 +28,21 @@ npm start
 2. 否则打开页面会看到「Initialize System」表单，自己设置管理员密码。
 3. 登录后在「Users」页添加操作用户，在「Layout Settings」页调整页面外观。
 
-## 免费公网部署（Render + Neon）⭐ 推荐
+## 免费公网部署（Vercel + Neon）⭐ 推荐（无需信用卡）
 
-全程免费：Render Web Service（每月 750 小时）+ Neon PostgreSQL（0.5GB 存储）。
+全程免费：Vercel Serverless（Hobby 免费版，无需绑定信用卡）+ Neon PostgreSQL（0.5GB 存储）。
 
-**👉 完整步骤请阅读 [DEPLOY-RENDER-NEON.md](./DEPLOY-RENDER-NEON.md)**
+**👉 完整步骤请阅读 [DEPLOY-VERCEL.md](./DEPLOY-VERCEL.md)**
 
 简要流程：
-1. 生成安全密钥（ENCRYPTION_KEY / SESSION_SECRET / ADMIN_INIT_PASSWORD）
+1. 生成安全密钥（ENCRYPTION_KEY / SESSION_SECRET / ADMIN_INIT_PASSWORD / CRON_SECRET）
 2. 注册 Neon → 创建免费 PostgreSQL 数据库 → 复制连接串
-3. 推送代码到 GitHub
-4. 在 Render 创建 Web Service → 配置环境变量 → 部署
-5. 配置 UptimeRobot 保活（防 Render 免费实例休眠）
+3. 推送代码到 GitHub（含 `api/index.js`、`api/cron.js`、`vercel.json`）
+4. 在 Vercel 导入 GitHub 仓库 → 配置环境变量 → Deploy（2 分钟上线）
+5. 每日提醒由 Vercel Cron 触发（免费版每天 1 次，北京 8:00）
 6. （可选）配置企业邮箱 SMTP 实现自动发信
 
-部署配置文件已就绪：`render.yaml`（Blueprint）、`Dockerfile`（备用）、`.dockerignore`、`.gitignore`。
+> 备选：常驻服务器方案见 [DEPLOY-RENDER-NEON.md](./DEPLOY-RENDER-NEON.md)（Render 新账号需绑定信用卡验证）。
 
 ## 安全说明
 
@@ -54,14 +54,18 @@ npm start
 ## 目录结构
 
 ```
-├── server.js              # 入口（已配置 trust proxy）
-├── render.yaml            # Render Blueprint 部署配置
-├── Dockerfile             # Docker 构建文件（备用）
-├── .dockerignore          # Docker 构建排除
+├── server.js              # 常驻服务器入口（本地调试 / 传统 PaaS）
+├── api/index.js           # Vercel Serverless 入口（全部请求路由到 Express）
+├── api/cron.js            # Vercel Cron 每日提醒端点（CRON_SECRET 鉴权）
+├── vercel.json            # Vercel 配置（rewrites + crons）
+├── render.yaml            # Render Blueprint 部署配置（备选）
+├── Dockerfile             # Docker 构建文件（备选）
 ├── .gitignore             # Git 排除
 ├── .env.example           # 环境变量模板
-├── DEPLOY-RENDER-NEON.md  # ⭐ Render+Neon 完整部署指南
+├── DEPLOY-VERCEL.md       # ⭐ Vercel+Neon 完整部署指南（无信用卡）
+├── DEPLOY-RENDER-NEON.md  # Render+Neon 部署指南（备选）
 ├── src/
+│   ├── app.js             # Express 应用工厂（本地与 Serverless 共用）
 │   ├── config.js          # 环境变量配置
 │   ├── db.js              # Knex + 数据库迁移（支持 pg / better-sqlite3）
 │   ├── middleware/auth.js # 会话认证中间件

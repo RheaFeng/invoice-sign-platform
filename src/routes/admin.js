@@ -1,5 +1,6 @@
 const express = require('express');
 const multer = require('multer');
+const config = require('../config');
 const { knex } = require('../db');
 const { encrypt, decrypt, encryptJson, generateToken, hashToken } = require('../services/security');
 const { parseExcel } = require('../services/excel');
@@ -82,7 +83,7 @@ router.get('/invoices/:id/link', async (req, res) => {
   if (!row) return res.status(404).json({ error: '发票不存在' });
   const token = decrypt(row.token_enc);
   if (!token) return res.status(500).json({ error: '无法还原签署链接' });
-  res.json({ link: `${process.env.BASE_URL || 'http://localhost:3000'}/sign/${token}` });
+  res.json({ link: `${config.baseUrl}/sign/${token}` });
 });
 
 // ===== Excel 上传生成发票 =====
@@ -93,7 +94,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     const created = [];
     for (const inv of invoices) {
       const token = generateToken();
-      const [id] = await knex('invoices').insert({
+      const inserted = await knex('invoices').insert({
         token_hash: hashToken(token),
         token_enc: encrypt(token),
         invoice_number_enc: encrypt(inv.display.invoiceNumber),
@@ -106,19 +107,19 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         sensitive_enc: encryptJson(inv.sensitive),
         total_amount: inv.totalAmount,
         status: 'pending',
-      });
-      created.push({ id: Number(id), agentName: inv.display.agentName, totalAmount: inv.totalAmount });
+      }).returning('id'); // pg 与 SQLite 均返回 [{ id }]
+      const id = Number(inserted[0]?.id);
+      created.push({ id, agentName: inv.display.agentName, totalAmount: inv.totalAmount });
     }
 
-    // 发送邀请邮件（SMTP 或草稿）
+    // 发送邀请邮件（SMTP 或草稿）— 并行发送，适配 Serverless 短超时
     let emailResult = { mode: 'none', draftCount: 0, sentCount: 0 };
-    for (let i = 0; i < invoices.length; i++) {
-      const inv = invoices[i];
+    const sendResults = await Promise.all(invoices.map(async (inv, i) => {
       const id = created[i].id;
       const row = await knex('invoices').where('id', id).first();
       const token = decrypt(row.token_enc);
       try {
-        const r = await sendInvitation({
+        return await sendInvitation({
           id,
           agentName: inv.display.agentName,
           agentEmail: inv.sensitive.agentEmail,
@@ -127,11 +128,15 @@ router.post('/upload', upload.single('file'), async (req, res) => {
           billingCycle: inv.display.billingCycle,
           totalAmount: inv.totalAmount,
         }, token);
-        if (r.mode === 'sent') emailResult.sentCount++;
-        else emailResult.draftCount++;
       } catch (e) {
-        emailResult.error = e.message;
+        return { error: e.message };
       }
+    }));
+    for (const r of sendResults) {
+      if (!r) continue;
+      if (r.error) emailResult.error = r.error;
+      else if (r.mode === 'sent') emailResult.sentCount++;
+      else emailResult.draftCount++;
     }
     emailResult.mode = emailResult.sentCount > 0 ? 'sent' : 'draft';
 

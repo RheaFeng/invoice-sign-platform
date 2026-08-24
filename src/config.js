@@ -13,7 +13,10 @@ function requireSecret(name, len) {
 
 const config = {
   port: parseInt(process.env.PORT || '3000', 10),
-  baseUrl: (process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`).replace(/\/+$/, ''),
+  // 优先用 BASE_URL；未配置时 Vercel 自动提供 VERCEL_URL（如 xxx.vercel.app）
+  baseUrl: (process.env.BASE_URL
+    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://localhost:${process.env.PORT || 3000}`)
+  ).replace(/\/+$/, ''),
 
   db: {
     client: process.env.DATABASE_CLIENT || 'better-sqlite3',

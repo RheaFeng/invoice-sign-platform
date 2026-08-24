@@ -11,6 +11,7 @@ const signLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 30,
   message: { error: '请求过于频繁，请稍后再试' },
+  validate: { trustProxy: false }, // Vercel 反向代理场景关闭该校验
 });
 
 function toPublicInvoice(row) {
