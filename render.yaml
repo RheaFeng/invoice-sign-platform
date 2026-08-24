@@ -1,0 +1,52 @@
+# Render Blueprint 配置 — 通过 render.yaml 一键创建服务
+# 文档: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: invoice-sign-platform
+    runtime: node
+    plan: free
+    buildCommand: npm install --omit=dev --omit=optional --no-audit --no-fund
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      # 部署后在 Render Dashboard 填入你的公网地址，如 https://invoice-sign-xxxx.onrender.com
+      - key: BASE_URL
+        sync: false
+      # Neon PostgreSQL 连接串（含 ?sslmode=require）
+      - key: DATABASE_CLIENT
+        value: pg
+      - key: DATABASE_URL
+        sync: false
+      # 安全密钥：node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      # 首次部署用，创建管理员后可在 Render Dashboard 删除此变量
+      - key: ADMIN_INIT_PASSWORD
+        sync: false
+      # ====== 以下为 SMTP 邮件配置（可选，不填则生成草稿） ======
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "465"
+      - key: SMTP_SECURE
+        value: "true"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: MAIL_REPLY_TO
+        sync: false
+      # 每日提醒时间（北京时间 10:00）
+      - key: REMINDER_CRON
+        value: "0 10 * * *"
+      - key: REMINDER_STRATEGY
+        value: ALL

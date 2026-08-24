@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Invoice Admin</title>
+<style>
+  :root { --theme: #1a56db; --bg: #f3f5f9; --card: #fff; --border: #e5e7eb; --text: #1f2937; --muted: #6b7280; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  .auth-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .auth-card { background: var(--card); border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,.08); padding: 40px; width: 100%; max-width: 420px; }
+  .auth-card h1 { font-size: 22px; margin-bottom: 6px; }
+  .auth-card .sub { color: var(--muted); font-size: 13.5px; margin-bottom: 24px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .field input { width: 100%; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 14px; }
+  .field input:focus { outline: none; border-color: var(--theme); }
+  .btn { padding: 11px 22px; border-radius: 8px; border: none; font-size: 14px; cursor: pointer; font-weight: 600; }
+  .btn-primary { background: var(--theme); color: #fff; width: 100%; padding: 13px; font-size: 15px; }
+  .btn-sm { padding: 6px 12px; font-size: 12.5px; }
+  .btn-ghost { background: #f1f3f5; color: #4b5563; }
+  .btn-danger { background: #fee2e2; color: #b91c1c; }
+  .alert { padding: 12px 16px; border-radius: 8px; font-size: 13.5px; margin-bottom: 16px; }
+  .alert-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+  .alert-success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+  .hidden { display: none; }
+
+  /* 主界面布局 */
+  .app { display: none; min-height: 100vh; }
+  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #111827; color: #d1d5db; padding: 20px 0; }
+  .sidebar .brand { padding: 0 20px 20px; font-size: 17px; font-weight: 700; color: #fff; border-bottom: 1px solid #1f2937; }
+  .sidebar nav { padding: 12px 0; }
+  .sidebar nav a { display: block; padding: 11px 20px; color: #9ca3af; text-decoration: none; font-size: 14px; cursor: pointer; }
+  .sidebar nav a:hover { color: #fff; background: #1f2937; }
+  .sidebar nav a.active { color: #fff; background: var(--theme); }
+  .sidebar .user-box { position: absolute; bottom: 0; left: 0; right: 0; padding: 16px 20px; border-top: 1px solid #1f2937; font-size: 13px; }
+  .sidebar .user-box .name { color: #fff; font-weight: 600; }
+  .sidebar .user-box a { color: #9ca3af; cursor: pointer; display: block; margin-top: 6px; font-size: 12.5px; }
+  .main { margin-left: 220px; padding: 28px 32px; }
+  .page-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .page-sub { color: var(--muted); font-size: 13.5px; margin-bottom: 24px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .stat { background: var(--card); border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .stat .num { font-size: 30px; font-weight: 800; }
+  .stat .lbl { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .stat.pending .num { color: #d97706; }
+  .stat.signed .num { color: #059669; }
+  .stat.total .num { color: var(--theme); }
+
+  .card { background: var(--card); border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); padding: 24px; margin-bottom: 24px; }
+  .card h2 { font-size: 16px; margin-bottom: 16px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
+  .toolbar select, .toolbar input[type=text] { padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13.5px; }
+  .toolbar .grow { flex: 1; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table th { text-align: left; padding: 10px 12px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .4px; border-bottom: 2px solid var(--border); }
+  table td { padding: 11px 12px; border-bottom: 1px solid #f1f3f5; }
+  table tr:hover td { background: #f8fafc; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+  .badge.pending { background: #fef3c7; color: #92400e; }
+  .badge.signed { background: #d1fae5; color: #065f46; }
+  .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pager { display: flex; gap: 8px; align-items: center; margin-top: 16px; font-size: 13px; color: var(--muted); }
+  .upload-zone { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 40px; text-align: center; cursor: pointer; transition: all .2s; }
+  .upload-zone:hover, .upload-zone.dragover { border-color: var(--theme); background: #f0f5ff; }
+  .upload-zone .icon { font-size: 36px; }
+  .upload-zone .tip { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  .upload-result { margin-top: 16px; font-size: 14px; }
+  .sig-thumb { max-width: 120px; max-height: 40px; border: 1px solid var(--border); border-radius: 6px; padding: 2px; }
+  .draft-item { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .draft-item .meta { font-size: 13px; }
+  .draft-item .meta b { font-size: 14px; }
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .settings-grid .full { grid-column: 1 / -1; }
+  .settings-grid textarea { width: 100%; min-height: 90px; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13.5px; font-family: inherit; }
+  .settings-grid input[type=text], .settings-grid input[type=color] { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13.5px; }
+  .settings-grid label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; }
+  .user-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; }
+  .user-row .info { font-size: 14px; }
+  .user-row .info .role { font-size: 12px; color: var(--muted); }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 50; }
+  .modal { background: #fff; border-radius: 14px; padding: 28px; width: 100%; max-width: 460px; }
+  .modal h3 { font-size: 17px; margin-bottom: 16px; }
+  .modal .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .empty { text-align: center; color: var(--muted); padding: 40px 0; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<!-- ===== 认证界面 ===== -->
+<div id="authWrap" class="auth-wrap">
+  <div class="auth-card">
+    <h1 id="authTitle">Invoice Admin</h1>
+    <p class="sub" id="authSub">Sign in to manage invoices</p>
+    <div id="authAlert"></div>
+
+    <!-- 初始化表单 -->
+    <div id="initForm" class="hidden">
+      <div class="field"><label>Admin Username</label><input id="initUser" value="admin"></div>
+      <div class="field"><label>Admin Password</label><input id="initPass" type="password" placeholder="at least 6 characters"></div>
+      <div class="field"><label>Confirm Password</label><input id="initPass2" type="password"></div>
+      <div class="field"><label>Display Name</label><input id="initName" placeholder="Administrator"></div>
+      <button class="btn btn-primary" id="initBtn">Create Admin Account</button>
+    </div>
+
+    <!-- 登录表单 -->
+    <div id="loginForm">
+      <div class="field"><label>Username</label><input id="loginUser" autocomplete="username"></div>
+      <div class="field"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password"></div>
+      <button class="btn btn-primary" id="loginBtn">Sign In</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 主界面 ===== -->
+<div id="app" class="app">
+  <aside class="sidebar">
+    <div class="brand">🧾 Invoice Admin</div>
+    <nav>
+      <a data-page="dashboard" class="active">📊 Dashboard</a>
+      <a data-page="invoices">📄 Invoices</a>
+      <a data-page="upload">⬆️ Upload Excel</a>
+      <a data-page="reminders">⏰ Reminders</a>
+      <a data-page="users">👥 Users</a>
+      <a data-page="settings">🎨 Layout Settings</a>
+      <a data-page="audit">📋 Audit Log</a>
+    </nav>
+    <div class="user-box">
+      <div class="name" id="meName">-</div>
+      <a id="changePwLink">🔑 Change password</a>
+      <a id="logoutLink">🚪 Sign out</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- Dashboard -->
+    <section id="page-dashboard">
+      <div class="page-title">Dashboard</div>
+      <div class="page-sub">Overview of invoice signing status</div>
+      <div class="cards">
+        <div class="stat pending"><div class="num" id="statPending">-</div><div class="lbl">Awaiting Signature</div></div>
+        <div class="stat signed"><div class="num" id="statSigned">-</div><div class="lbl">Signed</div></div>
+        <div class="stat total"><div class="num" id="statTotal">-</div><div class="lbl">Total</div></div>
+      </div>
+      <div class="card"><h2>Recent Invoices</h2><div id="recentList"></div></div>
+    </section>
+
+    <!-- Invoices -->
+    <section id="page-invoices" class="hidden">
+      <div class="page-title">Invoices</div>
+      <div class="page-sub">Track signing status and download signed PDFs</div>
+      <div class="card">
+        <div class="toolbar">
+          <select id="filterStatus"><option value="all">All status</option><option value="pending">Pending</option><option value="signed">Signed</option></select>
+          <input type="text" id="searchBox" placeholder="Search invoice number..." class="grow">
+          <button class="btn btn-primary btn-sm" id="searchBtn">Search</button>
+          <button class="btn btn-ghost btn-sm" id="downloadBtn">⬇️ Download selected (ZIP)</button>
+          <button class="btn btn-ghost btn-sm" id="selectAllBtn">Select all</button>
+        </div>
+        <div id="invoiceTableWrap"></div>
+        <div class="pager" id="pager"></div>
+      </div>
+    </section>
+
+    <!-- Upload -->
+    <section id="page-upload" class="hidden">
+      <div class="page-title">Upload Excel</div>
+      <div class="page-sub">Upload the invoice Excel template to generate invoices and send signing links</div>
+      <div class="card">
+        <div class="upload-zone" id="uploadZone">
+          <div class="icon">📄</div>
+          <p style="font-weight:600;margin-top:8px">Click or drag the Excel file here</p>
+          <p class="tip">Required columns: Agent name, Agent email, Total amount. Optional: Invoice date, Invoice Number, Project Name, Billing Cycle, rates &amp; hours, payment/bank details.</p>
+        </div>
+        <input type="file" id="fileInput" accept=".xlsx,.xls" class="hidden">
+        <div id="uploadResult" class="upload-result"></div>
+      </div>
+    </section>
+
+    <!-- Reminders -->
+    <section id="page-reminders" class="hidden">
+      <div class="page-title">Reminders</div>
+      <div class="page-sub">Daily automatic reminders at 10:00 (Beijing time) for unsigned invoices. If SMTP is not configured, drafts are generated here for manual sending.</div>
+      <div class="card">
+        <div class="toolbar">
+          <button class="btn btn-primary" id="runReminderBtn">🔔 Run reminder now</button>
+          <span id="reminderResult" style="font-size:13px;color:var(--muted)"></span>
+        </div>
+        <div id="draftList"></div>
+      </div>
+    </section>
+
+    <!-- Users -->
+    <section id="page-users" class="hidden">
+      <div class="page-title">Users</div>
+      <div class="page-sub">Manage operator accounts (admin only)</div>
+      <div class="card">
+        <button class="btn btn-primary btn-sm" id="addUserBtn" style="margin-bottom:16px">➕ Add user</button>
+        <div id="userList"></div>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section id="page-settings" class="hidden">
+      <div class="page-title">Layout Settings</div>
+      <div class="page-sub">Customize the signing page appearance and email templates (admin only)</div>
+      <div class="card">
+        <div class="settings-grid">
+          <div><label>Site title</label><input type="text" id="set_site.title"></div>
+          <div><label>Theme color</label><input type="color" id="set_site.theme_color"></div>
+          <div class="full"><label>Company name</label><input type="text" id="set_brand.company_name"></div>
+          <div class="full"><label>Department</label><input type="text" id="set_brand.department"></div>
+          <div class="full"><label>Sign page heading</label><input type="text" id="set_site.sign_heading"></div>
+          <div class="full"><label>Sign page subtext</label><textarea id="set_site.sign_subtext"></textarea></div>
+          <div class="full"><label>Page footer</label><textarea id="set_site.footer"></textarea></div>
+          <div class="full"><label>Email subject (invitation)</label><input type="text" id="set_mail.invite_subject"></div>
+          <div class="full"><label>Email subject (reminder)</label><input type="text" id="set_mail.reminder_subject"></div>
+          <div class="full"><label>Email body (invitation, optional HTML)</label><textarea id="set_mail.invite_body"></textarea></div>
+          <div class="full"><label>Email body (reminder, optional HTML)</label><textarea id="set_mail.reminder_body"></textarea></div>
+        </div>
+        <button class="btn btn-primary" id="saveSettingsBtn" style="margin-top:20px">💾 Save settings</button>
+      </div>
+    </section>
+
+    <!-- Audit -->
+    <section id="page-audit" class="hidden">
+      <div class="page-title">Audit Log</div>
+      <div class="page-sub">Recent system events</div>
+      <div class="card" id="auditList"></div>
+    </section>
+  </main>
+</div>
+
+<!-- 用户弹窗 -->
+<div id="userModal" class="modal-backdrop hidden">
+  <div class="modal">
+    <h3 id="userModalTitle">Add user</h3>
+    <div class="field"><label>Username</label><input id="mUser"></div>
+    <div class="field"><label>Display name</label><input id="mDisplay"></div>
+    <div class="field"><label>Password (blank = keep)</label><input id="mPass" type="password"></div>
+    <div class="field"><label>Role</label><select id="mRole"><option value="operator">Operator</option><option value="admin">Admin</option></select></div>
+    <div class="field"><label>Status</label><select id="mActive"><option value="true">Active</option><option value="false">Disabled</option></select></div>
+    <div class="actions"><button class="btn btn-ghost" id="userModalCancel">Cancel</button><button class="btn btn-primary" id="userModalSave">Save</button></div>
+  </div>
+</div>
+
+<!-- 改密弹窗 -->
+<div id="pwModal" class="modal-backdrop hidden">
+  <div class="modal">
+    <h3>Change password</h3>
+    <div class="field"><label>Current password</label><input id="oldPw" type="password"></div>
+    <div class="field"><label>New password</label><input id="newPw" type="password"></div>
+    <div class="actions"><button class="btn btn-ghost" id="pwCancel">Cancel</button><button class="btn btn-primary" id="pwSave">Save</button></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  let currentUser = null;
+  let currentPage = 'dashboard';
+  let invoicesCache = { items: [], total: 0 };
+  let selectedIds = new Set();
+  let page = 1, pageSize = 20;
+
+  function api(path, opts = {}) {
+    return fetch(path, { headers: { 'Content-Type': 'application/json' }, credentials: 'include', ...opts })
+      .then(async r => {
+        const d = await r.json().catch(() => ({}));
+        if (r.status === 401 && !path.endsWith('/login') && !path.endsWith('/init-status')) {
+          alert(d.error || '未登录或会话已过期');
+          location.reload();
+          return;
+        }
+        if (!r.ok) throw new Error(d.error || 'Request failed');
+        return d;
+      });
+  }
+  function showAlert(el, type, msg) { el.innerHTML = `<div class="alert alert-${type}">${msg}</div>`; }
+
+  // ===== 认证 =====
+  async function initAuth() {
+    try {
+      const st = await api('/api/auth/init-status');
+      if (!st.initialized) {
+        $('authTitle').textContent = 'Initialize System';
+        $('authSub').textContent = 'Set the admin password to secure your platform';
+        $('initForm').classList.remove('hidden');
+        $('loginForm').classList.add('hidden');
+      }
+    } catch (e) { showAlert($('authAlert'), 'error', e.message); }
+  }
+
+  $('initBtn').addEventListener('click', async () => {
+    const username = $('initUser').value.trim();
+    const pw = $('initPass').value, pw2 = $('initPass2').value;
+    if (pw.length < 6) return showAlert($('authAlert'), 'error', 'Password must be at least 6 characters');
+    if (pw !== pw2) return showAlert($('authAlert'), 'error', 'Passwords do not match');
+    try {
+      await api('/api/auth/init', { method: 'POST', body: JSON.stringify({ username, password: pw, displayName: $('initName').value }) });
+      showAlert($('authAlert'), 'success', 'Admin account created. Please sign in.');
+      $('initForm').classList.add('hidden');
+      $('loginForm').classList.remove('hidden');
+    } catch (e) { showAlert($('authAlert'), 'error', e.message); }
+  });
+
+  $('loginBtn').addEventListener('click', async () => {
+    try {
+      const d = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ username: $('loginUser').value.trim(), password: $('loginPass').value }) });
+      currentUser = d.user;
+      enterApp();
+    } catch (e) { showAlert($('authAlert'), 'error', e.message); }
+  });
+  $('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') $('loginBtn').click(); });
+
+  async function enterApp() {
+    $('authWrap').classList.add('hidden');
+    $('app').style.display = 'block';
+    $('meName').textContent = currentUser.display_name || currentUser.username;
+    loadDashboard();
+    if (currentUser.role !== 'admin') {
+      document.querySelectorAll('nav a[data-page]').forEach(a => {
+        if (['users', 'settings'].includes(a.dataset.page)) a.style.display = 'none';
+      });
+    }
+  }
+
+  $('logoutLink').addEventListener('click', async () => { await api('/api/auth/logout', { method: 'POST' }); location.reload(); });
+
+  // 改密
+  $('changePwLink').addEventListener('click', () => $('pwModal').classList.remove('hidden'));
+  $('pwCancel').addEventListener('click', () => $('pwModal').classList.add('hidden'));
+  $('pwSave').addEventListener('click', async () => {
+    try {
+      await api('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ oldPassword: $('oldPw').value, newPassword: $('newPw').value }) });
+      $('pwModal').classList.add('hidden'); $('oldPw').value = ''; $('newPw').value = '';
+      alert('Password updated.');
+    } catch (e) { alert(e.message); }
+  });
+
+  // ===== 页面导航 =====
+  document.querySelectorAll('nav a[data-page]').forEach(a => {
+    a.addEventListener('click', () => {
+      document.querySelectorAll('nav a').forEach(x => x.classList.remove('active'));
+      a.classList.add('active');
+      document.querySelectorAll('.main section').forEach(s => s.classList.add('hidden'));
+      $('page-' + a.dataset.page).classList.remove('hidden');
+      currentPage = a.dataset.page;
+      if (currentPage === 'dashboard') loadDashboard();
+      if (currentPage === 'invoices') loadInvoices();
+      if (currentPage === 'reminders') loadDrafts();
+      if (currentPage === 'users') loadUsers();
+      if (currentPage === 'settings') loadSettings();
+      if (currentPage === 'audit') loadAudit();
+    });
+  });
+
+  // ===== Dashboard =====
+  async function loadDashboard() {
+    try {
+      const d = await api('/api/admin/stats');
+      $('statPending').textContent = d.pending;
+      $('statSigned').textContent = d.signed;
+      $('statTotal').textContent = d.total;
+      $('recentList').innerHTML = d.recent.length ? `<table><thead><tr><th>Agent</th><th>Project</th><th>Amount</th><th>Status</th><th>Signed at</th></tr></thead><tbody>${
+        d.recent.map(r => `<tr><td>${esc(r.agentName)}</td><td>${esc(r.projectName)}</td><td>$${Number(r.totalAmount).toFixed(2)}</td><td><span class="badge ${r.status}">${r.status}</span></td><td>${r.signed_at ? new Date(r.signed_at).toLocaleString() : '-'}</td></tr>`).join('')
+      }</tbody></table>` : '<div class="empty">No invoices yet. Upload an Excel file to start.</div>';
+    } catch (e) { showAlert($('recentList'), 'error', e.message); }
+  }
+  function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+  // ===== Invoices =====
+  async function loadInvoices() {
+    try {
+      const params = new URLSearchParams({ page, pageSize, status: $('filterStatus').value, q: $('searchBox').value.trim() });
+      const d = await api('/api/admin/invoices?' + params);
+      invoicesCache = d;
+      const rows = d.items.map(r => {
+        const checked = selectedIds.has(r.id) ? 'checked' : '';
+        return `<tr>
+          <td><input type="checkbox" class="row-check" data-id="${r.id}" ${checked}></td>
+          <td>${esc(r.agentName)}</td>
+          <td>${esc(r.projectName)}</td>
+          <td>${esc(r.billingCycle)}</td>
+          <td>${esc(r.invoiceNumber)}</td>
+          <td>$${Number(r.totalAmount).toFixed(2)}</td>
+          <td><span class="badge ${r.status}">${r.status}</span></td>
+          <td>${r.remindCount || 0}</td>
+          <td>${r.signed_at ? new Date(r.signed_at).toLocaleDateString() : '-'}</td>
+          <td><div class="row-actions">
+            <button class="btn btn-ghost btn-sm" data-act="link" data-id="${r.id}">🔗 Link</button>
+            <button class="btn btn-ghost btn-sm" data-act="download" data-id="${r.id}">⬇️</button>
+          </div></td>
+        </tr>`;
+      }).join('');
+      $('invoiceTableWrap').innerHTML = d.items.length ? `<table><thead><tr><th></th><th>Agent</th><th>Project</th><th>Cycle</th><th>Invoice No.</th><th>Amount</th><th>Status</th><th>Reminders</th><th>Signed</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">No invoices found</div>';
+      const pages = Math.max(1, Math.ceil(d.total / pageSize));
+      $('pager').innerHTML = `Page ${page} / ${pages} · ${d.total} records <button class="btn btn-ghost btn-sm" id="prevPage">‹</button> <button class="btn btn-ghost btn-sm" id="nextPage">›</button>`;
+      $('prevPage').onclick = () => { if (page > 1) { page--; loadInvoices(); } };
+      $('nextPage').onclick = () => { if (page < pages) { page++; loadInvoices(); } };
+    } catch (e) { showAlert($('invoiceTableWrap'), 'error', e.message); }
+  }
+  $('searchBtn').addEventListener('click', () => { page = 1; loadInvoices(); });
+  $('filterStatus').addEventListener('change', () => { page = 1; loadInvoices(); });
+  $('selectAllBtn').addEventListener('click', () => {
+    invoicesCache.items.forEach(r => selectedIds.add(r.id));
+    loadInvoices();
+  });
+  document.addEventListener('change', e => {
+    if (e.target.classList.contains('row-check')) {
+      const id = Number(e.target.dataset.id);
+      e.target.checked ? selectedIds.add(id) : selectedIds.delete(id);
+    }
+  });
+  document.addEventListener('click', async e => {
+    const act = e.target.dataset?.act;
+    if (act === 'link') {
+      try {
+        const d = await api('/api/admin/invoices/' + e.target.dataset.id + '/link');
+        navigator.clipboard.writeText(d.link).then(() => alert('Link copied to clipboard: ' + d.link), () => alert(d.link));
+      } catch (err) { alert(err.message); }
+    }
+    if (act === 'download') {
+      window.location = '/api/admin/download?ids=' + e.target.dataset.id;
+    }
+  });
+  $('downloadBtn').addEventListener('click', () => {
+    if (!selectedIds.size) return alert('Select at least one invoice first');
+    window.location = '/api/admin/download?ids=' + [...selectedIds].join(',');
+  });
+
+  // ===== Upload =====
+  const zone = $('uploadZone'), fileInput = $('fileInput');
+  zone.addEventListener('click', () => fileInput.click());
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('dragover'); if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]); });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) uploadFile(fileInput.files[0]); });
+
+  async function uploadFile(file) {
+    const fd = new FormData();
+    fd.append('file', file);
+    $('uploadResult').innerHTML = '<div class="alert alert-success">⏳ Uploading &amp; generating invoices...</div>';
+    try {
+      const resp = await fetch('/api/admin/upload', { method: 'POST', body: fd });
+      const d = await resp.json();
+      if (!resp.ok) throw new Error(d.error || 'Upload failed');
+      let mailNote = '';
+      if (d.emailResult.mode === 'sent') mailNote = `📧 Invitation emails sent: ${d.emailResult.sentCount}`;
+      else if (d.emailResult.draftCount) mailNote = `📧 SMTP not configured — ${d.emailResult.draftCount} invitation draft(s) generated in Reminders.`;
+      $('uploadResult').innerHTML = `<div class="alert alert-success">✅ ${d.created} invoice(s) created successfully.<br>${mailNote}</div>`;
+      selectedIds.clear(); page = 1;
+      loadDashboard();
+    } catch (e) {
+      $('uploadResult').innerHTML = `<div class="alert alert-error">❌ ${esc(e.message)}</div>`;
+    }
+  }
+
+  // ===== Reminders =====
+  $('runReminderBtn').addEventListener('click', async () => {
+    $('reminderResult').textContent = 'Running...';
+    try {
+      const d = await api('/api/admin/remind/run', { method: 'POST' });
+      $('reminderResult').textContent = `Sent: ${d.sent} · Drafts: ${d.draft} · Skipped: ${d.skipped}`;
+      loadDrafts();
+    } catch (e) { $('reminderResult').textContent = e.message; }
+  });
+  async function loadDrafts() {
+    try {
+      const d = await api('/api/admin/drafts');
+      $('draftList').innerHTML = d.length ? d.map(x => `
+        <div class="draft-item">
+          <div class="meta"><b>${esc(x.kind)}</b> → ${esc(x.recipient)}<br>
+            <span style="color:var(--muted)">${new Date(x.createdAt).toLocaleString()} · <span class="badge ${x.status === 'failed' ? 'pending' : 'signed'}">${x.status}</span>${x.error ? ' · ' + esc(x.error) : ''}</span></div>
+          <button class="btn btn-primary btn-sm" onclick="location.href='/api/admin/drafts/${x.id}/eml'">⬇️ Download .eml</button>
+        </div>`).join('') : '<div class="empty">No drafts yet. Drafts appear here when SMTP is not configured, or run the reminder manually.</div>';
+    } catch (e) { showAlert($('draftList'), 'error', e.message); }
+  }
+
+  // ===== Users =====
+  let editingUserId = null;
+  async function loadUsers() {
+    try {
+      const d = await api('/api/auth/users');
+      $('userList').innerHTML = d.map(u => `
+        <div class="user-row">
+          <div class="info"><b>${esc(u.display_name || u.username)}</b> (@${esc(u.username)}) <span class="role">${u.role}</span> ${u.active ? '' : '<span class="badge pending">disabled</span>'}</div>
+          <div><button class="btn btn-ghost btn-sm" data-act="editUser" data-id="${u.id}">✏️ Edit</button>
+          ${u.id !== currentUser.id ? `<button class="btn btn-danger btn-sm" data-act="delUser" data-id="${u.id}">🗑️</button>` : ''}</div>
+        </div>`).join('') || '<div class="empty">No users</div>';
+    } catch (e) { showAlert($('userList'), 'error', e.message); }
+  }
+  $('addUserBtn').addEventListener('click', () => {
+    editingUserId = null;
+    $('userModalTitle').textContent = 'Add user';
+    $('mUser').value = ''; $('mDisplay').value = ''; $('mPass').value = ''; $('mRole').value = 'operator'; $('mActive').value = 'true';
+    $('userModal').classList.remove('hidden');
+  });
+  document.addEventListener('click', async e => {
+    if (e.target.dataset?.act === 'editUser') {
+      editingUserId = e.target.dataset.id;
+      try {
+        const d = await api('/api/auth/users');
+        const u = d.find(x => x.id == editingUserId);
+        $('userModalTitle').textContent = 'Edit user';
+        $('mUser').value = u.username; $('mUser').disabled = true;
+        $('mDisplay').value = u.display_name; $('mPass').value = ''; $('mRole').value = u.role; $('mActive').value = String(u.active);
+        $('userModal').classList.remove('hidden');
+      } catch (err) { alert(err.message); }
+    }
+    if (e.target.dataset?.act === 'delUser') {
+      if (!confirm('Delete this user?')) return;
+      try { await api('/api/auth/users/' + e.target.dataset.id, { method: 'DELETE' }); loadUsers(); } catch (err) { alert(err.message); }
+    }
+  });
+  $('userModalCancel').addEventListener('click', () => { $('userModal').classList.add('hidden'); $('mUser').disabled = false; });
+  $('userModalSave').addEventListener('click', async () => {
+    const body = { displayName: $('mDisplay').value, role: $('mRole').value, active: $('mActive').value === 'true' };
+    if ($('mPass').value) body.password = $('mPass').value;
+    if (editingUserId) {
+      if ($('mUser').value && $('mUser').value !== '') { /* username immutable */ }
+      try { await api('/api/auth/users/' + editingUserId, { method: 'PUT', body: JSON.stringify(body) }); $('userModal').classList.add('hidden'); $('mUser').disabled = false; loadUsers(); } catch (err) { alert(err.message); }
+    } else {
+      body.username = $('mUser').value.trim();
+      try { await api('/api/admin/users', { method: 'POST', body: JSON.stringify(body) }); $('userModal').classList.add('hidden'); loadUsers(); } catch (err) { alert(err.message); }
+    }
+  });
+
+  // ===== Settings =====
+  async function loadSettings() {
+    try {
+      const d = await api('/api/admin/settings');
+      const keys = ['site.title','site.theme_color','brand.company_name','brand.department','site.sign_heading','site.sign_subtext','site.footer','mail.invite_subject','mail.reminder_subject','mail.invite_body','mail.reminder_body'];
+      keys.forEach(k => { const el = $('set_' + k); if (el) el.value = d[k] || ''; });
+    } catch (e) { alert(e.message); }
+  }
+  $('saveSettingsBtn').addEventListener('click', async () => {
+    const keys = ['site.title','site.theme_color','brand.company_name','brand.department','site.sign_heading','site.sign_subtext','site.footer','mail.invite_subject','mail.reminder_subject','mail.invite_body','mail.reminder_body'];
+    const body = {};
+    keys.forEach(k => { body[k] = $('set_' + k).value; });
+    try { await api('/api/admin/settings', { method: 'PUT', body: JSON.stringify(body) }); alert('Settings saved.'); } catch (e) { alert(e.message); }
+  });
+
+  // ===== Audit =====
+  async function loadAudit() {
+    try {
+      const d = await api('/api/admin/audit');
+      $('auditList').innerHTML = d.length ? d.map(a => `<div style="padding:8px 0;border-bottom:1px solid #f1f3f5;font-size:13.5px"><b>${esc(a.action)}</b> <span style="color:var(--muted)">${esc(a.detail || '')} · ${new Date(a.created_at).toLocaleString()} · ${esc(a.ip || '')}</span></div>`).join('') : '<div class="empty">No events</div>';
+    } catch (e) { alert(e.message); }
+  }
+
+  initAuth();
+})();
+</script>
+</body>
+</html>

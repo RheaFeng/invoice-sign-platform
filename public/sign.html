@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Sign Invoice</title>
+<style>
+  :root { --theme: #1a56db; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", Roboto, sans-serif; background: #f3f5f9; color: #1f2937; min-height: 100vh; }
+  .topbar { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+  .topbar .logo { font-size: 20px; font-weight: 700; color: var(--theme); }
+  .topbar .sub { color: #6b7280; font-size: 13px; }
+  .container { max-width: 860px; margin: 32px auto 60px; padding: 0 20px; }
+  .card { background: #fff; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.08); padding: 32px; margin-bottom: 24px; }
+  h1 { font-size: 22px; margin-bottom: 8px; }
+  .subtext { color: #6b7280; font-size: 14px; line-height: 1.7; margin-bottom: 8px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+  .meta .item { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 16px; flex: 1; min-width: 180px; }
+  .meta .label { font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: .5px; }
+  .meta .value { font-size: 15px; font-weight: 600; margin-top: 4px; word-break: break-all; }
+  table.details { width: 100%; border-collapse: collapse; margin: 16px 0; }
+  table.details th { text-align: left; font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: .5px; padding: 10px 12px; border-bottom: 2px solid #e5e7eb; }
+  table.details td { padding: 12px; border-bottom: 1px solid #f1f3f5; font-size: 14px; }
+  table.details td.num, table.details th.num { text-align: right; }
+  .total-row td { font-weight: 700; font-size: 16px; border-top: 2px solid #e5e7eb; border-bottom: none !important; }
+  .total-amount { color: var(--theme); font-size: 26px; font-weight: 800; margin: 8px 0 4px; }
+  .sign-section { border-top: 1px dashed #d1d5db; padding-top: 24px; margin-top: 8px; }
+  .sign-section h2 { font-size: 17px; margin-bottom: 4px; }
+  .tabs { display: flex; gap: 8px; margin: 16px 0; }
+  .tab { padding: 8px 18px; border-radius: 20px; border: 1.5px solid #d1d5db; background: #fff; cursor: pointer; font-size: 14px; color: #4b5563; }
+  .tab.active { background: var(--theme); border-color: var(--theme); color: #fff; }
+  .sign-panel { display: none; }
+  .sign-panel.active { display: block; }
+  #sigCanvas { border: 2px dashed #cbd5e1; border-radius: 10px; background: #fafcff; touch-action: none; width: 100%; cursor: crosshair; }
+  .canvas-toolbar { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+  .btn { padding: 10px 20px; border-radius: 8px; border: none; font-size: 14px; cursor: pointer; }
+  .btn-ghost { background: #f1f3f5; color: #4b5563; }
+  .btn-primary { background: var(--theme); color: #fff; font-weight: 600; width: 100%; padding: 14px; font-size: 16px; border-radius: 10px; margin-top: 18px; }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+  input[type=text] { width: 100%; padding: 12px 14px; border: 1.5px solid #d1d5db; border-radius: 8px; font-size: 15px; }
+  .hint { color: #9ca3af; font-size: 12px; margin-top: 8px; }
+  .secure-note { display: flex; align-items: center; gap: 8px; color: #6b7280; font-size: 12.5px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; margin-top: 20px; }
+  .footer { text-align: center; color: #9ca3af; font-size: 12.5px; padding: 20px 0 40px; }
+  .alert { padding: 14px 18px; border-radius: 10px; margin-bottom: 20px; font-size: 14px; }
+  .alert-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+  .alert-success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+  .success-icon { font-size: 48px; text-align: center; margin-bottom: 12px; }
+  .hidden { display: none; }
+  .sig-preview { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; background: #fafcff; font-family: 'Segoe Script', cursive, sans-serif; font-size: 28px; text-align: center; color: #1f2937; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="logo" id="brandLogo">Invoice Sign</div>
+    <div class="sub" id="brandSub">Secure Invoice Signing</div>
+  </div>
+
+  <div class="container">
+    <div id="alertBox"></div>
+
+    <!-- 加载中 -->
+    <div id="loadingCard" class="card" style="text-align:center;padding:60px 20px">
+      <div style="font-size:32px">⏳</div>
+      <p style="margin-top:12px;color:#6b7280">Loading your invoice...</p>
+    </div>
+
+    <!-- 错误 -->
+    <div id="errorCard" class="card hidden" style="text-align:center;padding:60px 20px">
+      <div class="success-icon">🔒</div>
+      <h1 id="errorTitle">Link not valid</h1>
+      <p class="subtext" id="errorMsg" style="margin-top:12px"></p>
+    </div>
+
+    <!-- 已签署 -->
+    <div id="signedCard" class="card hidden" style="text-align:center;padding:60px 20px">
+      <div class="success-icon">✅</div>
+      <h1>Signature Confirmed</h1>
+      <p class="subtext" style="margin-top:12px">Thank you! Your invoice has been successfully signed. You may close this page.</p>
+    </div>
+
+    <!-- 发票+签署 -->
+    <div id="invoiceCard" class="card hidden">
+      <h1 id="signHeading">Please review and sign your invoice</h1>
+      <p class="subtext" id="signSubtext"></p>
+
+      <div class="meta">
+        <div class="item"><div class="label">Invoice No.</div><div class="value" id="invNumber">-</div></div>
+        <div class="item"><div class="label">Invoice Date</div><div class="value" id="invDate">-</div></div>
+        <div class="item"><div class="label">Project</div><div class="value" id="invProject">-</div></div>
+        <div class="item"><div class="label">Billing Cycle</div><div class="value" id="invCycle">-</div></div>
+      </div>
+
+      <table class="details">
+        <thead><tr><th>Description</th><th class="num">Rate</th><th class="num">Hours</th><th class="num">Amount</th></tr></thead>
+        <tbody id="detailsBody"></tbody>
+        <tfoot><tr class="total-row"><td colspan="3" style="text-align:right">TOTAL</td><td class="num totalAmountCell" id="invTotal">-</td></tr></tfoot>
+      </table>
+
+      <div class="sign-section">
+        <h2>Signature</h2>
+        <p class="subtext">Draw your signature below or type your name. Your signature confirms the invoice details are correct.</p>
+        <div class="tabs">
+          <button class="tab active" data-panel="draw">✍️ Draw</button>
+          <button class="tab" data-panel="typed">⌨️ Type Name</button>
+        </div>
+
+        <div id="panel-draw" class="sign-panel active">
+          <canvas id="sigCanvas" width="780" height="200"></canvas>
+          <div class="canvas-toolbar">
+            <span class="hint">Use your mouse or finger to sign</span>
+            <button class="btn btn-ghost" id="clearBtn">Clear</button>
+          </div>
+        </div>
+
+        <div id="panel-typed" class="sign-panel">
+          <input type="text" id="typedName" placeholder="Type your full name" autocomplete="off" maxlength="80">
+          <div class="hint">Your typed name will be used as your signature.</div>
+        </div>
+
+        <button class="btn-primary" id="submitBtn">Confirm &amp; Sign</button>
+        <div class="secure-note">🔐 This page is private to you only. It cannot be used to view anyone else's invoice data.</div>
+      </div>
+    </div>
+
+    <div class="footer" id="siteFooter"></div>
+  </div>
+
+<script>
+(function(){
+  const token = location.pathname.split('/').pop();
+  let cfg = {};
+  let invoice = null;
+  let signatureImage = null;
+
+  const $ = id => document.getElementById(id);
+
+  // Canvas 签名
+  const canvas = $('sigCanvas');
+  const ctx = canvas.getContext('2d');
+  let drawing = false;
+  function resizeCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = rect.width * ratio;
+    canvas.height = rect.height * ratio;
+    ctx.scale(ratio, ratio);
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#1f2937';
+  }
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+  }
+  canvas.addEventListener('mousedown', e => { drawing = true; ctx.beginPath(); ctx.moveTo(getPos(e).x, getPos(e).y); });
+  canvas.addEventListener('mousemove', e => { if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); });
+  canvas.addEventListener('mouseup', () => drawing = false);
+  canvas.addEventListener('mouseleave', () => drawing = false);
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); });
+  canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); });
+  canvas.addEventListener('touchend', () => drawing = false);
+  $('clearBtn').addEventListener('click', () => ctx.clearRect(0, 0, canvas.width, canvas.height));
+  window.addEventListener('resize', () => { /* keep drawing area */ });
+
+  function isCanvasEmpty() {
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    for (let i = 3; i < data.length; i += 4) if (data[i] !== 0) return false;
+    return true;
+  }
+
+  // Tab 切换
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.sign-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      $('panel-' + tab.dataset.panel).classList.add('active');
+    });
+  });
+
+  // 渲染发票
+  function renderInvoice(inv) {
+    invoice = inv;
+    $('invNumber').textContent = inv.invoiceNumber || '-';
+    $('invDate').textContent = inv.invoiceDate || '-';
+    $('invProject').textContent = inv.projectName || '-';
+    $('invCycle').textContent = inv.billingCycle || '-';
+    const tbody = $('detailsBody');
+    tbody.innerHTML = '';
+    (inv.details || []).forEach(d => {
+      const tr = document.createElement('tr');
+      const num = v => v == null || v === '' ? '—' : '$' + Number(v).toFixed(2);
+      const hrs = v => v == null || v === '' ? '—' : v;
+      tr.innerHTML = `<td>${d.description || ''}</td><td class="num">${num(d.rate)}</td><td class="num">${hrs(d.hours)}</td><td class="num">${num(d.amount)}</td>`;
+      tbody.appendChild(tr);
+    });
+    $('invTotal').textContent = '$' + Number(inv.totalAmount || 0).toFixed(2);
+    $('loadingCard').classList.add('hidden');
+    $('invoiceCard').classList.remove('hidden');
+  }
+
+  function showError(title, msg) {
+    $('loadingCard').classList.add('hidden');
+    $('errorTitle').textContent = title;
+    $('errorMsg').textContent = msg;
+    $('errorCard').classList.remove('hidden');
+  }
+
+  function showAlert(type, msg) {
+    $('alertBox').innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+  }
+
+  // 提交
+  $('submitBtn').addEventListener('click', async () => {
+    const activePanel = document.querySelector('.tab.active').dataset.panel;
+    let payload = { signType: activePanel };
+    if (activePanel === 'draw') {
+      if (isCanvasEmpty()) { showAlert('error', 'Please draw your signature first.'); return; }
+      signatureImage = canvas.toDataURL('image/png');
+      payload.signatureImage = signatureImage;
+    } else {
+      const name = $('typedName').value.trim();
+      if (!name) { showAlert('error', 'Please type your name first.'); return; }
+      payload.signerName = name;
+    }
+    $('submitBtn').disabled = true;
+    $('submitBtn').textContent = 'Submitting...';
+    try {
+      const resp = await fetch(`/api/sign/invoice/${token}/sign`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      const data = await resp.json();
+      if (!resp.ok) { showAlert('error', data.error || 'Submission failed'); $('submitBtn').disabled = false; $('submitBtn').textContent = 'Confirm & Sign'; return; }
+      $('invoiceCard').classList.add('hidden');
+      $('signedCard').classList.remove('hidden');
+    } catch (e) {
+      showAlert('error', 'Network error, please retry.');
+      $('submitBtn').disabled = false;
+      $('submitBtn').textContent = 'Confirm & Sign';
+    }
+  });
+
+  // 初始化
+  (async function init() {
+    try {
+      const [cfgResp, invResp] = await Promise.all([
+        fetch('/api/sign/config'),
+        fetch(`/api/sign/invoice/${token}`),
+      ]);
+      cfg = await cfgResp.json();
+      const invData = await invResp.json();
+      if (!invResp.ok) {
+        showError(cfg.siteTitle || 'Link not valid', invData.error || 'Invalid link.');
+        applyConfig(cfg);
+        return;
+      }
+      applyConfig(cfg);
+      if (invData.invoice.status === 'signed') {
+        $('loadingCard').classList.add('hidden');
+        $('signedCard').classList.remove('hidden');
+        return;
+      }
+      renderInvoice(invData.invoice);
+      setTimeout(resizeCanvas, 60);
+    } catch (e) {
+      showError('Error', 'Unable to load the invoice. Please check the link and try again.');
+    }
+  })();
+
+  function applyConfig(c) {
+    if (c.themeColor) { document.documentElement.style.setProperty('--theme', c.themeColor); }
+    if (c.siteTitle) { document.title = c.siteTitle; $('brandLogo').textContent = c.siteTitle; }
+    if (c.companyName && c.department) $('brandSub').textContent = `${c.companyName} · ${c.department}`;
+    else if (c.companyName) $('brandSub').textContent = c.companyName;
+    if (c.signHeading) $('signHeading').textContent = c.signHeading;
+    if (c.signSubtext) $('signSubtext').textContent = c.signSubtext;
+    if (c.footer) $('siteFooter').textContent = c.footer;
+  }
+})();
+</script>
+</body>
+</html>
