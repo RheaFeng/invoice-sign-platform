@@ -19,7 +19,10 @@ const config = {
   ).replace(/\/+$/, ''),
 
   db: {
-    client: process.env.DATABASE_CLIENT || 'better-sqlite3',
+    // 只要 DATABASE_URL 是 postgresql:// 开头就强制用 pg，避免 Vercel 上 DATABASE_CLIENT 漏配导致走 SQLite
+    client: (process.env.DATABASE_URL || '').startsWith('postgresql://')
+      ? 'pg'
+      : (process.env.DATABASE_CLIENT || 'better-sqlite3'),
     url: process.env.DATABASE_URL || '',
     sqlitePath: path.join(__dirname, '..', 'data', 'app.db'),
   },

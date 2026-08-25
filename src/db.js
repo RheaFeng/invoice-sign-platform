@@ -4,9 +4,11 @@ const path = require('path');
 
 const usePg = config.db.client === 'pg';
 
-// SQLite 需要确保目录存在
+// SQLite 需要确保目录存在；pg 模式跳过，避免 Vercel 等只读文件系统报错
 if (!usePg) {
   fs.mkdirSync(path.dirname(config.db.sqlitePath), { recursive: true });
+} else {
+  console.log('[db] using PostgreSQL:', config.db.url.replace(/:.*@/, ':***@'));
 }
 
 const knex = require('knex')({
