@@ -4,6 +4,13 @@ const path = require('path');
 
 const usePg = config.db.client === 'pg';
 
+// 生产环境/Serverless 必须配置 DATABASE_URL，否则不可能使用 SQLite
+if (!usePg && process.env.NODE_ENV === 'production') {
+  throw new Error(
+    '生产环境必须配置 DATABASE_URL 以使用 PostgreSQL。当前未检测到 DATABASE_URL，应用回退到 SQLite，而 Vercel/Render 等 Serverless 平台的文件系统是只读的，无法创建数据库目录。请前往 Vercel Dashboard → Project Settings → Environment Variables 添加 DATABASE_URL，并勾选 Production 环境。'
+  );
+}
+
 // SQLite 需要确保目录存在；pg 模式跳过，避免 Vercel 等只读文件系统报错
 if (!usePg) {
   try {

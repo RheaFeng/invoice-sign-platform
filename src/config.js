@@ -27,6 +27,17 @@ const config = {
     sqlitePath: path.join(__dirname, '..', 'data', 'app.db'),
   },
 
+  // 启动时打印一次环境变量快照（不泄露密钥），方便排查 Vercel 环境变量未生效的问题
+  startupLog: {
+    nodeEnv: process.env.NODE_ENV || '(unset)',
+    databaseClient: (process.env.DATABASE_URL || '').trim() ? 'pg' : (process.env.DATABASE_CLIENT || 'better-sqlite3'),
+    hasDatabaseUrl: !!(process.env.DATABASE_URL || '').trim(),
+    hasEncryptionKey: !!process.env.ENCRYPTION_KEY,
+    hasSessionSecret: !!process.env.SESSION_SECRET,
+    hasAdminPassword: !!process.env.ADMIN_INIT_PASSWORD,
+    baseUrl: (process.env.BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')).replace(/\/+$/, ''),
+  },
+
   security: {
     encryptionKey: process.env.ENCRYPTION_KEY
       ? Buffer.from(process.env.ENCRYPTION_KEY, 'base64')

@@ -4,14 +4,7 @@
 const { app } = require('../src/app');
 
 // 冷启动时打印环境信息（不暴露密钥），便于排查
-console.log('[vercel] cold start', {
-  nodeEnv: process.env.NODE_ENV,
-  databaseClient: process.env.DATABASE_CLIENT,
-  databaseUrlPrefix: (process.env.DATABASE_URL || '').split(':')[0] || '(unset)',
-  hasEncryptionKey: !!process.env.ENCRYPTION_KEY,
-  hasSessionSecret: !!process.env.SESSION_SECRET,
-  hasAdminPassword: !!process.env.ADMIN_INIT_PASSWORD,
-  vercelUrl: process.env.VERCEL_URL || '(unset)',
-});
+const config = require('../src/config');
+console.log('[vercel] cold start', config.startupLog);
 
 module.exports = (req, res) => app(req, res);
