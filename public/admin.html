@@ -446,7 +446,7 @@
     fd.append('file', file);
     $('uploadResult').innerHTML = '<div class="alert alert-success">⏳ Uploading &amp; generating invoices...</div>';
     try {
-      const resp = await fetch('/api/admin/upload', { method: 'POST', body: fd });
+      const resp = await fetch('/api/admin/upload', { method: 'POST', credentials: 'include', body: fd });
       const d = await resp.json();
       if (!resp.ok) throw new Error(d.error || 'Upload failed');
       let mailNote = '';

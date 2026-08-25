@@ -55,7 +55,14 @@ router.post('/login', loginLimiter, async (req, res) => {
     }
     if (!user.active) return res.status(403).json({ error: '账号已被禁用' });
     const cookie = sessionCookie(user);
-    res.cookie('session', cookie, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 864e5, secure: req.secure || req.headers['x-forwarded-proto'] === 'https' });
+    const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+    res.cookie('session', cookie, {
+      httpOnly: true,
+      path: '/',
+      sameSite: isSecure ? 'none' : 'lax',
+      secure: isSecure,
+      maxAge: 7 * 864e5,
+    });
     res.json({ ok: true, user: { id: user.id, username: user.username, display_name: user.display_name, role: user.role } });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -71,7 +78,8 @@ router.get('/me', requireAuth, async (req, res) => {
 
 // 登出
 router.post('/logout', (req, res) => {
-  res.clearCookie('session');
+  const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+  res.clearCookie('session', { path: '/', sameSite: isSecure ? 'none' : 'lax', secure: isSecure });
   res.json({ ok: true });
 });
 
