@@ -6,7 +6,11 @@ const usePg = config.db.client === 'pg';
 
 // SQLite 需要确保目录存在；pg 模式跳过，避免 Vercel 等只读文件系统报错
 if (!usePg) {
-  fs.mkdirSync(path.dirname(config.db.sqlitePath), { recursive: true });
+  try {
+    fs.mkdirSync(path.dirname(config.db.sqlitePath), { recursive: true });
+  } catch (err) {
+    console.warn('[db] SQLite 目录创建失败，将在连接时再次尝试:', err.message);
+  }
 } else {
   console.log('[db] using PostgreSQL:', config.db.url.replace(/:.*@/, ':***@'));
 }
