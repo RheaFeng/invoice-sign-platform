@@ -56,10 +56,12 @@ router.post('/login', loginLimiter, async (req, res) => {
     if (!user.active) return res.status(403).json({ error: '账号已被禁用' });
     const cookie = sessionCookie(user);
     const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+    console.log('[auth/login] setting session cookie for user', user.id, 'secure=', isSecure, 'proto=', req.headers['x-forwarded-proto']);
     res.cookie('session', cookie, {
       httpOnly: true,
       path: '/',
-      sameSite: isSecure ? 'none' : 'lax',
+      // 同域部署用 lax 更稳定；Vercel HTTPS 下 secure=true 即可
+      sameSite: 'lax',
       secure: isSecure,
       maxAge: 7 * 864e5,
     });
@@ -79,7 +81,7 @@ router.get('/me', requireAuth, async (req, res) => {
 // 登出
 router.post('/logout', (req, res) => {
   const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
-  res.clearCookie('session', { path: '/', sameSite: isSecure ? 'none' : 'lax', secure: isSecure });
+  res.clearCookie('session', { path: '/', sameSite: 'lax', secure: isSecure });
   res.json({ ok: true });
 });
 
@@ -87,12 +89,24 @@ router.post('/logout', (req, res) => {
 router.post('/change-password', requireAuth, async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body || {};
+    console.log('[auth/change-password] request from uid', req.user?.uid, 'cookie present=', !!req.cookies?.session);
     const user = await knex('users').where('id', req.user.uid).first();
     if (!user || !verifyPassword(String(oldPassword || ''), user.password_hash)) {
       return res.status(401).json({ error: '原密码错误' });
     }
     if (String(newPassword || '').length < 6) return res.status(400).json({ error: '新密码至少 6 位' });
     await knex('users').where('id', user.id).update({ password_hash: hashPassword(String(newPassword)) });
+
+    // 修改密码后重新签发 session cookie，避免某些浏览器/代理场景下旧 cookie 失效
+    const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+    res.cookie('session', sessionCookie(user), {
+      httpOnly: true,
+      path: '/',
+      sameSite: 'lax',
+      secure: isSecure,
+      maxAge: 7 * 864e5,
+    });
+
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
