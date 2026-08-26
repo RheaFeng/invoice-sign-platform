@@ -267,12 +267,25 @@
   let selectedIds = new Set();
   let page = 1, pageSize = 20;
 
+  // ===== Token 会话（替代 cookie：Vercel 上 cookie 容易被浏览器拒收）=====
+  const TOKEN_KEY = 'invoice_admin_token';
+  function getToken() { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
+  function setToken(t) { try { if (t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
+
+  // 通用请求包装：自动附带 Authorization: Bearer <token>
   function api(path, opts = {}) {
-    return fetch(path, { headers: { 'Content-Type': 'application/json' }, credentials: 'include', ...opts })
+    const headers = { ...(opts.headers || {}) };
+    // FormData 不能手动设 Content-Type（需要浏览器自动生成 boundary）
+    if (!(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json';
+    const token = getToken();
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    return fetch(path, { ...opts, headers, credentials: 'include' })
       .then(async r => {
         const d = await r.json().catch(() => ({}));
-        if (r.status === 401 && !path.endsWith('/login') && !path.endsWith('/init-status')) {
-          // 先抛错让调用方 catch，再统一刷新；避免 alert 后继续执行成功逻辑
+        const noAuthNeeded = ['/api/auth/login', '/api/auth/init-status', '/api/auth/me']
+          .some(p => path === p || path.startsWith(p + '?'));
+        if (r.status === 401 && !noAuthNeeded) {
+          setToken('');
           const err = new Error(d.error || '未登录或会话已过期');
           setTimeout(() => { alert(err.message); location.reload(); }, 0);
           throw err;
@@ -281,10 +294,46 @@
         return d;
       });
   }
+
+  // 带鉴权的文件下载（GET 导航带不了 Authorization 头，改用 fetch blob）
+  async function downloadViaFetch(url, fallbackName = 'download') {
+    try {
+      const resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + getToken() } });
+      if (!resp.ok) {
+        const d = await resp.json().catch(() => ({}));
+        throw new Error(d.error || `Download failed (${resp.status})`);
+      }
+      const blob = await resp.blob();
+      const cd = resp.headers.get('Content-Disposition') || '';
+      const m = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
+      const name = m ? decodeURIComponent(m[1]) : fallbackName;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(a.href);
+    } catch (e) { alert(e.message); }
+  }
+
   function showAlert(el, type, msg) { el.innerHTML = `<div class="alert alert-${type}">${msg}</div>`; }
 
   // ===== 认证 =====
   async function initAuth() {
+    // 1) 本地有 token 则尝试恢复会话（用裸 fetch 避免 401 弹窗）
+    const token = getToken();
+    if (token) {
+      try {
+        const resp = await fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } });
+        const me = await resp.json();
+        if (resp.ok && me && me.id) {
+          currentUser = me;
+          enterApp();
+          return;
+        }
+      } catch (e) { /* 网络错误：fallthrough 到登录界面 */ }
+      setToken('');
+    }
+    // 2) 判断是否首次初始化
     try {
       const st = await api('/api/auth/init-status');
       if (!st.initialized) {
@@ -294,12 +343,7 @@
         $('loginForm').classList.add('hidden');
       }
     } catch (e) {
-      // 已经登录并进入主界面时，init-status 失败不应阻塞使用
-      if (!$('app').style.display || $('app').style.display === 'none') {
-        showAlert($('authAlert'), 'error', e.message);
-      } else {
-        console.warn('[initAuth]', e.message);
-      }
+      showAlert($('authAlert'), 'error', e.message);
     }
   }
 
@@ -319,6 +363,7 @@
   $('loginBtn').addEventListener('click', async () => {
     try {
       const d = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ username: $('loginUser').value.trim(), password: $('loginPass').value }) });
+      setToken(d.token);
       currentUser = d.user;
       enterApp();
     } catch (e) { showAlert($('authAlert'), 'error', e.message); }
@@ -337,7 +382,11 @@
     }
   }
 
-  $('logoutLink').addEventListener('click', async () => { await api('/api/auth/logout', { method: 'POST' }); location.reload(); });
+  $('logoutLink').addEventListener('click', async () => {
+    try { await api('/api/auth/logout', { method: 'POST' }); } catch (e) {}
+    setToken('');
+    location.reload();
+  });
 
   // 改密
   function closePwModal() { $('pwModal').classList.add('hidden'); $('oldPw').value = ''; $('newPw').value = ''; }
@@ -347,23 +396,13 @@
   $('pwSave').addEventListener('click', async () => {
     const oldPw = $('oldPw').value;
     const newPw = $('newPw').value;
-    console.log('[change-password] sending request');
+    if (newPw.length < 6) return alert('New password must be at least 6 characters');
     try {
-      const resp = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ oldPassword: oldPw, newPassword: newPw }),
-      });
-      console.log('[change-password] response status', resp.status);
-      const d = await resp.json().catch(() => ({}));
-      if (!resp.ok) {
-        throw new Error(d.error || 'Request failed');
-      }
-      $('pwModal').classList.add('hidden'); $('oldPw').value = ''; $('newPw').value = '';
+      const d = await api('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ oldPassword: oldPw, newPassword: newPw }) });
+      if (d.token) setToken(d.token); // 改密后服务端重新签发，更新本地令牌
+      closePwModal();
       alert('Password updated.');
     } catch (e) {
-      console.error('[change-password] error', e.message);
       alert(e.message);
     }
   });
@@ -451,12 +490,15 @@
       } catch (err) { alert(err.message); }
     }
     if (act === 'download') {
-      window.location = '/api/admin/download?ids=' + e.target.dataset.id;
+      downloadViaFetch('/api/admin/download?ids=' + e.target.dataset.id, 'invoice.pdf');
+    }
+    if (act === 'eml') {
+      downloadViaFetch('/api/admin/drafts/' + e.target.dataset.id + '/eml', 'draft.eml');
     }
   });
   $('downloadBtn').addEventListener('click', () => {
     if (!selectedIds.size) return alert('Select at least one invoice first');
-    window.location = '/api/admin/download?ids=' + [...selectedIds].join(',');
+    downloadViaFetch('/api/admin/download?ids=' + [...selectedIds].join(','), 'invoices.zip');
   });
 
   // ===== Upload =====
@@ -472,9 +514,7 @@
     fd.append('file', file);
     $('uploadResult').innerHTML = '<div class="alert alert-success">⏳ Uploading &amp; generating invoices...</div>';
     try {
-      const resp = await fetch('/api/admin/upload', { method: 'POST', credentials: 'include', body: fd });
-      const d = await resp.json();
-      if (!resp.ok) throw new Error(d.error || 'Upload failed');
+      const d = await api('/api/admin/upload', { method: 'POST', body: fd });
       let mailNote = '';
       if (d.emailResult.mode === 'sent') mailNote = `📧 Invitation emails sent: ${d.emailResult.sentCount}`;
       else if (d.emailResult.draftCount) mailNote = `📧 SMTP not configured — ${d.emailResult.draftCount} invitation draft(s) generated in Reminders.`;
@@ -502,7 +542,7 @@
         <div class="draft-item">
           <div class="meta"><b>${esc(x.kind)}</b> → ${esc(x.recipient)}<br>
             <span style="color:var(--muted)">${new Date(x.createdAt).toLocaleString()} · <span class="badge ${x.status === 'failed' ? 'pending' : 'signed'}">${x.status}</span>${x.error ? ' · ' + esc(x.error) : ''}</span></div>
-          <button class="btn btn-primary btn-sm" onclick="location.href='/api/admin/drafts/${x.id}/eml'">⬇️ Download .eml</button>
+          <button class="btn btn-primary btn-sm" data-act="eml" data-id="${x.id}">⬇️ Download .eml</button>
         </div>`).join('') : '<div class="empty">No drafts yet. Drafts appear here when SMTP is not configured, or run the reminder manually.</div>';
     } catch (e) { showAlert($('draftList'), 'error', e.message); }
   }

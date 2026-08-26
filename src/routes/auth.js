@@ -54,18 +54,18 @@ router.post('/login', loginLimiter, async (req, res) => {
       return res.status(401).json({ error: '用户名或密码错误' });
     }
     if (!user.active) return res.status(403).json({ error: '账号已被禁用' });
-    const cookie = sessionCookie(user);
+    // 签发签名会话令牌：前端存 localStorage，请求带 Authorization: Bearer <token>
+    // （cookie 仍写入作为兼容，但不再作为主要鉴权手段，避免 Vercel/浏览器 cookie 策略问题）
+    const token = sessionCookie(user);
     const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
-    console.log('[auth/login] setting session cookie for user', user.id, 'secure=', isSecure, 'proto=', req.headers['x-forwarded-proto']);
-    res.cookie('session', cookie, {
+    res.cookie('session', token, {
       httpOnly: true,
       path: '/',
-      // 同域部署用 lax 更稳定；Vercel HTTPS 下 secure=true 即可
       sameSite: 'lax',
       secure: isSecure,
       maxAge: 7 * 864e5,
     });
-    res.json({ ok: true, user: { id: user.id, username: user.username, display_name: user.display_name, role: user.role } });
+    res.json({ ok: true, token, user: { id: user.id, username: user.username, display_name: user.display_name, role: user.role } });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -97,17 +97,17 @@ router.post('/change-password', requireAuth, async (req, res) => {
     if (String(newPassword || '').length < 6) return res.status(400).json({ error: '新密码至少 6 位' });
     await knex('users').where('id', user.id).update({ password_hash: hashPassword(String(newPassword)) });
 
-    // 修改密码后重新签发 session cookie，避免某些浏览器/代理场景下旧 cookie 失效
-    const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
-    res.cookie('session', sessionCookie(user), {
+    // 修改密码后重新签发会话令牌返回给前端
+    const token = sessionCookie(user);
+    res.cookie('session', token, {
       httpOnly: true,
       path: '/',
       sameSite: 'lax',
-      secure: isSecure,
+      secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
       maxAge: 7 * 864e5,
     });
 
-    res.json({ ok: true });
+    res.json({ ok: true, token });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
