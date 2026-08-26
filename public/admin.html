@@ -277,7 +277,7 @@
           setTimeout(() => { alert(err.message); location.reload(); }, 0);
           throw err;
         }
-        if (!r.ok) throw new Error(d.error || 'Request failed');
+        if (!r.ok) throw new Error(d.error || `Request failed (${r.status})`);
         return d;
       });
   }
@@ -293,7 +293,14 @@
         $('initForm').classList.remove('hidden');
         $('loginForm').classList.add('hidden');
       }
-    } catch (e) { showAlert($('authAlert'), 'error', e.message); }
+    } catch (e) {
+      // 已经登录并进入主界面时，init-status 失败不应阻塞使用
+      if (!$('app').style.display || $('app').style.display === 'none') {
+        showAlert($('authAlert'), 'error', e.message);
+      } else {
+        console.warn('[initAuth]', e.message);
+      }
+    }
   }
 
   $('initBtn').addEventListener('click', async () => {
@@ -333,8 +340,10 @@
   $('logoutLink').addEventListener('click', async () => { await api('/api/auth/logout', { method: 'POST' }); location.reload(); });
 
   // 改密
+  function closePwModal() { $('pwModal').classList.add('hidden'); $('oldPw').value = ''; $('newPw').value = ''; }
   $('changePwLink').addEventListener('click', () => $('pwModal').classList.remove('hidden'));
-  $('pwCancel').addEventListener('click', () => $('pwModal').classList.add('hidden'));
+  $('pwCancel').addEventListener('click', closePwModal);
+  $('pwModal').addEventListener('click', e => { if (e.target === $('pwModal')) closePwModal(); });
   $('pwSave').addEventListener('click', async () => {
     const oldPw = $('oldPw').value;
     const newPw = $('newPw').value;
@@ -534,7 +543,9 @@
       try { await api('/api/auth/users/' + e.target.dataset.id, { method: 'DELETE' }); loadUsers(); } catch (err) { alert(err.message); }
     }
   });
-  $('userModalCancel').addEventListener('click', () => { $('userModal').classList.add('hidden'); $('mUser').disabled = false; });
+  function closeUserModal() { $('userModal').classList.add('hidden'); $('mUser').disabled = false; }
+  $('userModalCancel').addEventListener('click', closeUserModal);
+  $('userModal').addEventListener('click', e => { if (e.target === $('userModal')) closeUserModal(); });
   $('userModalSave').addEventListener('click', async () => {
     const body = { displayName: $('mDisplay').value, role: $('mRole').value, active: $('mActive').value === 'true' };
     if ($('mPass').value) body.password = $('mPass').value;
@@ -569,6 +580,14 @@
       $('auditList').innerHTML = d.length ? d.map(a => `<div style="padding:8px 0;border-bottom:1px solid #f1f3f5;font-size:13.5px"><b>${esc(a.action)}</b> <span style="color:var(--muted)">${esc(a.detail || '')} · ${new Date(a.created_at).toLocaleString()} · ${esc(a.ip || '')}</span></div>`).join('') : '<div class="empty">No events</div>';
     } catch (e) { alert(e.message); }
   }
+
+  // ESC 关闭弹窗兜底
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (!$('pwModal').classList.contains('hidden')) closePwModal();
+      if (!$('userModal').classList.contains('hidden')) closeUserModal();
+    }
+  });
 
   initAuth();
 })();
