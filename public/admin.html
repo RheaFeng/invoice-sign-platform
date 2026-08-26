@@ -272,9 +272,10 @@
       .then(async r => {
         const d = await r.json().catch(() => ({}));
         if (r.status === 401 && !path.endsWith('/login') && !path.endsWith('/init-status')) {
-          alert(d.error || '未登录或会话已过期');
-          location.reload();
-          return;
+          // 先抛错让调用方 catch，再统一刷新；避免 alert 后继续执行成功逻辑
+          const err = new Error(d.error || '未登录或会话已过期');
+          setTimeout(() => { alert(err.message); location.reload(); }, 0);
+          throw err;
         }
         if (!r.ok) throw new Error(d.error || 'Request failed');
         return d;
@@ -335,11 +336,27 @@
   $('changePwLink').addEventListener('click', () => $('pwModal').classList.remove('hidden'));
   $('pwCancel').addEventListener('click', () => $('pwModal').classList.add('hidden'));
   $('pwSave').addEventListener('click', async () => {
+    const oldPw = $('oldPw').value;
+    const newPw = $('newPw').value;
+    console.log('[change-password] sending request');
     try {
-      await api('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ oldPassword: $('oldPw').value, newPassword: $('newPw').value }) });
+      const resp = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ oldPassword: oldPw, newPassword: newPw }),
+      });
+      console.log('[change-password] response status', resp.status);
+      const d = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        throw new Error(d.error || 'Request failed');
+      }
       $('pwModal').classList.add('hidden'); $('oldPw').value = ''; $('newPw').value = '';
       alert('Password updated.');
-    } catch (e) { alert(e.message); }
+    } catch (e) {
+      console.error('[change-password] error', e.message);
+      alert(e.message);
+    }
   });
 
   // ===== 页面导航 =====
